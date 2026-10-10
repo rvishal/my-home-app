@@ -3,6 +3,7 @@
 	import { householdStore } from '../../lib/stores/household.svelte';
 	import { generateId } from '../../lib/crypto';
 	import { formatCurrency, formatDate, getScheduleStatus, generateEMISchedules } from '../../lib/utils';
+	import { sendTelegram, formatScheduleMessage } from '../../lib/telegram';
 	import type { PaymentSchedule } from '../../lib/types';
 
 	let showForm = $state(false);
@@ -72,6 +73,20 @@
 	async function deleteSchedule(id: string) {
 		if (!confirm('Delete this schedule?')) return;
 		await dataStore.deleteSchedule(id);
+	}
+
+	async function shareToTelegram(schedule: PaymentSchedule) {
+		const settings = dataStore.settings;
+		if (!settings?.telegramBotToken || !settings?.telegramChatId) {
+			alert('Please configure Telegram in Settings first.');
+			return;
+		}
+		await sendTelegram(
+			settings.telegramBotToken,
+			settings.telegramChatId,
+			formatScheduleMessage(schedule)
+		);
+		alert('Shared to Telegram.');
 	}
 
 	const sortedSchedules = $derived(
@@ -229,6 +244,12 @@
 								: 'bg-success-500 text-white'}"
 						>
 							{schedule.status === 'paid' ? 'Mark pending' : 'Mark paid'}
+						</button>
+						<button
+							onclick={() => shareToTelegram(schedule)}
+							class="btn rounded-md bg-tertiary-500 px-3 py-1 text-sm text-white"
+						>
+							Telegram
 						</button>
 						<button
 							onclick={() => deleteSchedule(schedule.id)}

@@ -2,7 +2,11 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { dataStore } from '../../../lib/stores/data.svelte';
+	import { householdStore } from '../../../lib/stores/household.svelte';
+	import { generateId } from '../../../lib/crypto';
 	import { formatCurrency, formatDate } from '../../../lib/utils';
+	import { sendTelegram, formatHomeMessage } from '../../../lib/telegram';
+	import type { Document } from '../../../lib/types';
 
 	const id = $derived(page.params.id);
 	let home = $derived(dataStore.homes.find((h) => h.id === id));
@@ -45,6 +49,62 @@
 		await dataStore.deleteHome(home.id);
 		goto('/homes');
 	}
+
+	async function shareToTelegram() {
+		if (!home) return;
+		const settings = dataStore.settings;
+		if (!settings?.telegramBotToken || !settings?.telegramChatId) {
+			alert('Please configure Telegram in Settings first.');
+			return;
+		}
+		await sendTelegram(settings.telegramBotToken, settings.telegramChatId, formatHomeMessage(home));
+		alert('Shared to Telegram.');
+	}
+
+	async function handleFileUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file || !home || !householdStore.household) return;
+
+		const reader = new FileReader();
+		reader.onload = async () => {
+			const doc: Document = {
+				id: generateId(),
+				householdId: householdStore.household!.id,
+				relatedType: 'home',
+				relatedId: home.id,
+				title: file.name,
+				fileUrl: reader.result as string,
+				mimeType: file.type,
+				createdAt: new Date().toISOString()
+			};
+			await dataStore.updateHome({ ...home, documents: [...home.documents, doc] });
+		};
+		reader.readAsDataURL(file);
+	}
+
+	async function sendDocumentToTelegram(doc: Document) {
+		const settings = dataStore.settings;
+		if (!settings?.telegramBotToken || !settings?.telegramChatId) {
+			alert('Please configure Telegram in Settings first.');
+			return;
+		}
+		await sendTelegram(
+			settings.telegramBotToken,
+			settings.telegramChatId,
+			`Document: ${doc.title}`,
+			doc.fileUrl
+		);
+		alert('Document sent to Telegram.');
+	}
+
+	async function deleteDocument(docId: string) {
+		if (!home) return;
+		await dataStore.updateHome({
+			...home,
+			documents: home.documents.filter((d) => d.id !== docId)
+		});
+	}
 </script>
 
 {#if !home}
@@ -59,6 +119,12 @@
 					class="btn rounded-md bg-secondary-500 px-4 py-2 text-white hover:bg-secondary-600"
 				>
 					{isEditing ? 'Cancel' : 'Edit'}
+				</button>
+				<button
+					onclick={shareToTelegram}
+					class="btn rounded-md bg-tertiary-500 px-4 py-2 text-white hover:bg-tertiary-600"
+				>
+					Share to Telegram
 				</button>
 				<button
 					onclick={remove}
@@ -170,5 +236,44 @@
 				{/if}
 			</div>
 		{/if}
+
+		<div class="rounded-lg bg-surface-100-900 p-6 shadow">
+			<h2 class="h4 mb-4">Documents</h2>
+			<label class="label mb-4 block">
+				<span>Upload document</span>
+				<input
+					type="file"
+					onchange={handleFileUpload}
+					class="input w-full rounded-md border border-surface-300-700 bg-surface-50-950 p-2"
+				/>
+			</label>
+			{#if home.documents.length === 0}
+				<p class="text-surface-600-400">No documents uploaded yet.</p>
+			{:else}
+				<ul class="space-y-2">
+					{#each home.documents as doc (doc.id)}
+						<li class="flex items-center justify-between rounded-md bg-surface-50-950 p-2">
+							<a href={doc.fileUrl} target="_blank" class="text-primary-500 hover:underline">
+								{doc.title}
+							</a>
+							<div class="flex gap-2">
+								<button
+									onclick={() => sendDocumentToTelegram(doc)}
+									class="btn rounded-md bg-tertiary-500 px-2 py-1 text-xs text-white"
+								>
+									Send to Telegram
+								</button>
+								<button
+									onclick={() => deleteDocument(doc.id)}
+									class="btn rounded-md bg-error-500 px-2 py-1 text-xs text-white"
+								>
+									Delete
+								</button>
+							</div>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
 	</div>
 {/if}

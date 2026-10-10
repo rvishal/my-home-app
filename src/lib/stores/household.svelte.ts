@@ -77,7 +77,10 @@ function createHouseholdStore() {
 			backupEnabled: true,
 			calendarToken,
 			emailReminders: true,
-			browserReminders: true
+			browserReminders: true,
+			telegramBotToken: '',
+			telegramChatId: '',
+			telegramRemindersEnabled: false
 		};
 		await db.settings.put(settings);
 
@@ -173,7 +176,10 @@ function createHouseholdStore() {
 				backupEnabled: true,
 				calendarToken: generateToken(32),
 				emailReminders: true,
-				browserReminders: true
+				browserReminders: true,
+				telegramBotToken: '',
+				telegramChatId: '',
+				telegramRemindersEnabled: false
 			});
 		}
 	}

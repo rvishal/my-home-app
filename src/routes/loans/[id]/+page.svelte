@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { dataStore } from '../../../lib/stores/data.svelte';
 	import { formatCurrency, generateAmortizationSchedule } from '../../../lib/utils';
+	import { sendTelegram, formatLoanMessage } from '../../../lib/telegram';
 	import { parseISO } from 'date-fns';
 
 	const id = $derived(page.params.id);
@@ -27,6 +28,21 @@
 		await dataStore.deleteLoan(loan.id);
 		goto('/loans');
 	}
+
+	async function shareToTelegram() {
+		if (!loan) return;
+		const settings = dataStore.settings;
+		if (!settings?.telegramBotToken || !settings?.telegramChatId) {
+			alert('Please configure Telegram in Settings first.');
+			return;
+		}
+		await sendTelegram(
+			settings.telegramBotToken,
+			settings.telegramChatId,
+			formatLoanMessage(loan, home?.name)
+		);
+		alert('Shared to Telegram.');
+	}
 </script>
 
 {#if !loan}
@@ -38,6 +54,12 @@
 				<h1 class="h2">{loan.bankName}</h1>
 				<p class="text-surface-600-400">{home?.name || 'Unlinked home'}</p>
 			</div>
+			<button
+				onclick={shareToTelegram}
+				class="btn rounded-md bg-tertiary-500 px-4 py-2 text-white hover:bg-tertiary-600"
+			>
+				Share to Telegram
+			</button>
 			<button
 				onclick={remove}
 				class="btn rounded-md bg-error-500 px-4 py-2 text-white hover:bg-error-600"

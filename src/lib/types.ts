@@ -83,6 +83,9 @@ export interface HouseholdSettings {
 	pushSubscription?: object;
 	emailReminders: boolean;
 	browserReminders: boolean;
+	telegramBotToken: string;
+	telegramChatId: string;
+	telegramRemindersEnabled: boolean;
 }
 
 export interface HouseholdMember {
